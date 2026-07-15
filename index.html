@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Blind Stick - Monitor Anak</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        .sensor-card {
+            transition: all 0.3s ease;
+        }
+        .sensor-card:hover {
+            transform: translateY(-5px);
+        }
+        .status-indicator {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .alert-danger {
+            animation: alertPulse 1s infinite;
+        }
+        @keyframes alertPulse {
+            0%, 100% { background-color: rgb(239, 68, 68); }
+            50% { background-color: rgb(185, 28, 28); }
+        }
+        .map-container {
+            height: 400px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .status-online {
+            color: #22c55e;
+        }
+        .status-offline {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i data-lucide="navigation" class="w-8 h-8"></i>
+                    <h1 class="text-2xl font-bold">Smart Blind Stick - Monitor Anak</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div id="connectionStatus" class="w-3 h-3 bg-green-400 rounded-full status-indicator"></div>
+                        <span id="connectionText" class="text-sm">Terhubung</span>
+                    </div>
+                    <span id="currentTime" class="text-sm"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <!-- Alert Section -->
+        <div id="alertSection" class="hidden mb-6">
+            <div class="bg-red-500 text-white p-4 rounded-lg shadow-lg alert-danger">
+                <div class="flex items-center space-x-3">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                    <div>
+                        <h3 class="font-bold text-lg">⚠️ PERINGATAN!</h3>
+                        <p id="alertMessage">Ada objek mendekati</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Stats Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <!-- GPS Status -->
+            <div class="bg-white rounded-lg shadow-md p-4 sensor-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Status GPS</p>
+                        <p id="gpsStatus" class="text-2xl font-bold text-green-600">Aktif</p>
+                    </div>
+                    <i data-lucide="map-pin" class="w-10 h-10 text-blue-500"></i>
+                </div>
+            </div>
+
+            <!-- Device Status -->
+            <div class="bg-white rounded-lg shadow-md p-4 sensor-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Status Tongkat</p>
+                        <p id="stickStatus" class="text-2xl font-bold text-green-600">Online</p>
+                    </div>
+                    <i data-lucide="hand" class="w-10 h-10 text-green-500"></i>
+                </div>
+            </div>
+
+            <!-- Vibration Motor -->
+            <div class="bg-white rounded-lg shadow-md p-4 sensor-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Motor Vibrator</p>
+                        <p id="vibrationStatus" class="text-2xl font-bold text-gray-800">Mati</p>
+                    </div>
+                    <i data-lucide="vibrate" class="w-10 h-10 text-purple-500"></i>
+                </div>
+            </div>
+
+            <!-- Battery -->
+            <div class="bg-white rounded-lg shadow-md p-4 sensor-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Baterai</p>
+                        <p id="batteryLevel" class="text-2xl font-bold text-gray-800">85%</p>
+                    </div>
+                    <i data-lucide="battery-full" class="w-10 h-10 text-green-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content: Map -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Map Section -->
+            <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-4">
+                <h2 class="text-xl font-bold mb-4 flex items-center">
+                    <i data-lucide="map" class="w-6 h-6 mr-2"></i>
+                    Lokasi Anak
+                </h2>
+                <div id="map" class="map-container"></div>
+                <div class="mt-4 grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500">Latitude</p>
+                        <p id="latitude" class="text-lg font-semibold">-6.2088</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Longitude</p>
+                        <p id="longitude" class="text-lg font-semibold">106.8456</p>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-center justify-between">
+                    <a id="mapsLink" href="#" target="_blank" 
+                       class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition">
+                        📍 Buka di Google Maps
+                    </a>
+                    <span id="lastUpdate" class="text-sm text-gray-500">Terakhir update: -</span>
+                </div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <h2 class="text-xl font-bold mb-4 flex items-center">
+                    <i data-lucide="settings" class="w-6 h-6 mr-2"></i>
+                    Panel Orang Tua
+                </h2>
+                
+                <!-- Alert Aktif -->
+                <div class="mb-6 p-4 bg-red-50 rounded-lg">
+                    <h3 class="font-semibold text-red-700 flex items-center">
+                        <i data-lucide="bell" class="w-5 h-5 mr-2"></i>
+                        Alert Aktif
+                    </h3>
+                    <p id="activeAlertCount" class="text-2xl font-bold text-red-600">0</p>
+                    <div id="alertList" class="mt-2 text-sm text-gray-600"></div>
+                </div>
+
+                <!-- Vibration Motor Control -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Kontrol Motor Vibrator
+                    </label>
+                    <div class="flex space-x-2">
+                        <button id="vibrationOn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">
+                            ON
+                        </button>
+                        <button id="vibrationOff" class="flex-1 bg-red-
