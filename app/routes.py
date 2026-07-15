@@ -101,8 +101,13 @@ async def receive_sensor_data(data: SensorData):
 # ==================== GET LATEST DATA ====================
 @router.get("/sensors")
 def get_sensors_dashboard():
-    """Get latest sensor data (for dashboard)"""
+    """Get latest sensor data (for dashboard)
+
+    Important: keep response fast (do not touch MongoDB here), because some clients may
+    timeout while waiting for the external request.
+    """
     return latest_data
+
 
 @router.get("/sensors/latest")
 def get_latest_data():
