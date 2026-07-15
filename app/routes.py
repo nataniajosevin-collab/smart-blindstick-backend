@@ -6,28 +6,19 @@ from app.utils import (
     latest_data, history_data, alert_logs, vibration_status,
     check_alerts, save_alert, update_vibrator
 )
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.get("/")
-def root():
-    return {
-        "message": "Smart Blind Stick API Running Successfully",
-        "status": "online",
-        "version": "2.0.0"
-    }
-
-@router.get("/health")
-def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
-
-# ==================== ENDPOINT UTAMA (ESP32 & HTML DASHBOARD) ====================
+# ==================== ENDPOINT SENSOR ====================
 @router.post("/sensors")
 async def receive_sensor_data(data: SensorData):
     global latest_data, history_data, vibration_status
-    db = get_database()
     
-    # Update data terbaru dengan format camelCase (Sesuai kebutuhan HTML)
+    logger.info(f"📥 Received sensor data from {data.device_id}")
+    
+    # Update data terbaru
     latest_data = {
         "deviceId": data.device_id,
         "ultrasonic": data.ultrasonic,
@@ -51,40 +42,53 @@ async def receive_sensor_data(data: SensorData):
     if len(history_data) > 100:
         history_data.pop(0)
     
-    # Simpan berkas log ke database cloud MongoDB
-    sensor_doc = {
-        "device_id": data.device_id,
-        "ultrasonic": data.ultrasonic,
-        "tof_left": data.tof_left,
-        "tof_right": data.tof_right,
-        "alert_distance": data.alert_distance,
-        "battery": data.battery,
-        "gps": {
-            "latitude": data.gps.latitude,
-            "longitude": data.gps.longitude,
-            "satellites": data.gps.satellites,
-            "speed": data.gps.speed,
-            "altitude": data.gps.altitude,
-            "accuracy": data.gps.accuracy,
-            "gps_fix": data.gps.gps_fix
-        },
-        "timestamp": datetime.now()
-    }
-    await db.sensor_data.insert_one(sensor_doc)
+    # 🔥 Simpan ke database (dengan error handling)
+    try:
+        db = get_database()
+        if db:
+            sensor_doc = {
+                "device_id": data.device_id,
+                "ultrasonic": data.ultrasonic,
+                "tof_left": data.tof_left,
+                "tof_right": data.tof_right,
+                "alert_distance": data.alert_distance,
+                "battery": data.battery,
+                "gps": {
+                    "latitude": data.gps.latitude,
+                    "longitude": data.gps.longitude,
+                    "satellites": data.gps.satellites,
+                    "speed": data.gps.speed,
+                    "altitude": data.gps.altitude,
+                    "accuracy": data.gps.accuracy,
+                    "gps_fix": data.gps.gps_fix
+                },
+                "timestamp": datetime.now()
+            }
+            await db.sensor_data.insert_one(sensor_doc)
+            logger.info("💾 Data saved to MongoDB")
+        else:
+            logger.warning("⚠️ No database connection - data not saved")
+    except Exception as e:
+        logger.error(f"❌ Error saving to database: {e}")
     
-    # Cek & simpan alert jika ada objek mendekat
+    # Cek alert
     alerts = check_alerts(latest_data)
     for alert in alerts:
         save_alert(data.device_id, alert)
-        alert_doc = {
-            "device_id": data.device_id,
-            "timestamp": datetime.now(),
-            "type": alert["type"],
-            "distance": alert["distance"],
-            "message": alert["message"],
-            "acknowledged": False
-        }
-        await db.alert_logs.insert_one(alert_doc)
+        try:
+            db = get_database()
+            if db:
+                alert_doc = {
+                    "device_id": data.device_id,
+                    "timestamp": datetime.now(),
+                    "type": alert["type"],
+                    "distance": alert["distance"],
+                    "message": alert["message"],
+                    "acknowledged": False
+                }
+                await db.alert_logs.insert_one(alert_doc)
+        except:
+            pass
         
     update_vibrator(alerts)
     
@@ -94,16 +98,17 @@ async def receive_sensor_data(data: SensorData):
         "vibration": vibration_status["status"]
     }
 
+# ==================== GET LATEST DATA ====================
 @router.get("/sensors")
 def get_sensors_dashboard():
-    """Melayani request GET /api/sensors dari index.html"""
+    """Get latest sensor data (for dashboard)"""
     return latest_data
 
 @router.get("/sensors/latest")
 def get_latest_data():
     return latest_data
 
-# ==================== ENDPOINT VIBRATOR & STATS ====================
+# ==================== VIBRATOR ====================
 @router.post("/vibration")
 def control_vibration(command: VibrationCommand):
     global vibration_status
@@ -119,35 +124,60 @@ def control_vibration(command: VibrationCommand):
 def get_vibration_status():
     return vibration_status
 
+# ==================== ALERTS ====================
 @router.get("/alerts")
 def get_alerts(limit: int = 20):
-    return {"total": len(alert_logs), "data": alert_logs[-limit:]} if alert_logs else {"message": "No alerts"}
+    if alert_logs:
+        return {"total": len(alert_logs), "data": alert_logs[-limit:]}
+    return {"message": "No alerts"}
 
+# ==================== STATS ====================
 @router.get("/stats")
 def get_stats():
     if not history_data:
-        return {"total_alerts": 0, "avg_distance": 0, "battery": 100, "gps_fix": False}
+        return {
+            "total_alerts": 0,
+            "avg_distance": 0,
+            "battery": 100,
+            "gps_fix": False,
+            "total_readings": 0
+        }
     recent = history_data[-10:]
     avg_dist = sum(d.get("ultrasonic", 0) for d in recent) / len(recent)
     return {
         "total_alerts": len(alert_logs),
         "avg_distance": round(avg_dist, 2),
         "battery": latest_data.get("battery", 0),
-        "gps_fix": latest_data.get("gps", {}).get("gpsFix", False)
+        "gps_fix": latest_data.get("gps", {}).get("gpsFix", False),
+        "total_readings": len(history_data)
     }
 
-# ==================== ENDPOINT PANELS ORANG TUA ====================
+# ==================== LOCATION (FOR PARENTS) ====================
 @router.get("/location/current/{device_id}")
 async def get_current_location(device_id: str):
-    db = get_database()
-    data = await db.sensor_data.find_one({"device_id": device_id}, sort=[("timestamp", -1)])
-    if not data:
-        raise HTTPException(status_code=404, detail="Device not found")
-    return {
-        "device_id": device_id,
-        "latitude": data.get("gps", {}).get("latitude", 0),
-        "longitude": data.get("gps", {}).get("longitude", 0),
-        "timestamp": data.get("timestamp"),
-        "battery": data.get("battery", 0),
-        "gps_fix": data.get("gps", {}).get("gps_fix", False)
-    }
+    try:
+        db = get_database()
+        if not db:
+            return {
+                "device_id": device_id,
+                "message": "Database not available"
+            }
+        
+        data = await db.sensor_data.find_one(
+            {"device_id": device_id},
+            sort=[("timestamp", -1)]
+        )
+        if not data:
+            raise HTTPException(status_code=404, detail="Device not found")
+        
+        return {
+            "device_id": device_id,
+            "latitude": data.get("gps", {}).get("latitude", 0),
+            "longitude": data.get("gps", {}).get("longitude", 0),
+            "timestamp": data.get("timestamp"),
+            "battery": data.get("battery", 0),
+            "gps_fix": data.get("gps", {}).get("gps_fix", False)
+        }
+    except Exception as e:
+        logger.error(f"❌ Error getting location: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -2,42 +2,48 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.routes import router
-from app.database import connect_to_mongo, close_mongo_connection
+from app.database import get_database, close_database
 import os
-from dotenv import load_dotenv
+import logging
 
-load_dotenv()
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ==================== LIFESPAN ====================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("=" * 60)
-    print("🚀 SMART BLIND STICK BACKEND v2.0")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("🚀 SMART BLIND STICK BACKEND v2.0")
+    logger.info("=" * 60)
+    
+    # Test database connection
     try:
-        await connect_to_mongo()
-        print("✅ MongoDB Connected!")
+        db = get_database()
+        if db:
+            logger.info("✅ Database connected!")
+        else:
+            logger.warning("⚠️ Database not connected!")
     except Exception as e:
-        print(f"❌ MongoDB Connection Failed: {e}")
-    print("✅ Backend ready!")
-    print("=" * 60)
+        logger.error(f"❌ Database error: {e}")
+    
+    logger.info("✅ Backend ready!")
     yield
+    
     # Shutdown
-    await close_mongo_connection()
-    print("👋 Shutting down...")
+    close_database()
+    logger.info("👋 Shutting down...")
 
-# ==================== INISIALISASI APP ====================
+# ==================== APP ====================
 app = FastAPI(
     title="Smart Blind Stick API",
-    description="API untuk monitoring tongkat pintar dengan tracking GPS",
     version="2.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url="/docs"
 )
 
-# ==================== CORS MIDDLEWARE ====================
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -52,34 +58,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==================== REGISTER ROUTER ====================
 app.include_router(router, prefix="/api")
 
-# ==================== ROOT ENDPOINT ====================
 @app.get("/")
 def root():
-    return {
-        "message": "Smart Blind Stick API",
-        "status": "running",
-        "version": "2.0.0",
-        "docs": "/docs",
-        "redoc": "/redoc"
-    }
+    return {"message": "Smart Blind Stick API", "status": "running"}
 
 @app.get("/health")
 def health_check():
-    from datetime import datetime
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }
-
-# ==================== JALANKAN (untuk local testing) ====================
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+    return {"status": "healthy", "timestamp": "2026-07-15T23:30:00"}

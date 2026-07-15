@@ -4,19 +4,46 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://nataniajosevin_db_user:x4NE!UGYdtfL7%23S@cluster0.o4uxoky.mongodb.net/?appName=Cluster0")
+MONGO_URI = os.getenv("MONGO_URI", "")
 DATABASE_NAME = os.getenv("DATABASE_NAME", "smart_blindstick")
-client = None
-db = None
+
+class Database:
+    client = None
+    db = None
+
+db = Database()
 
 def get_database():
-    global client, db
-    if client is None:
-        client = AsyncIOMotorClient(MONGO_URI)
-        db = client[DATABASE_NAME]
-    return db
+    """Get database connection"""
+    global db
+    
+    if db.client is None:
+        if not MONGO_URI:
+            print("❌ MONGO_URI not set!")
+            return None
+        
+        try:
+            print(f"📡 Connecting to MongoDB...")
+            db.client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+            db.db = db.client[DATABASE_NAME]
+            
+            # Test connection
+            db.client.admin.command('ping')
+            print("✅ Connected to MongoDB Atlas!")
+            print(f"📊 Database: {DATABASE_NAME}")
+            
+        except Exception as e:
+            print(f"❌ MongoDB connection error: {e}")
+            print("⚠️ Running without database!")
+            return None
+    
+    return db.db
 
 def close_database():
-    global client
-    if client:
-        client.close()
+    """Close database connection"""
+    global db
+    if db.client:
+        db.client.close()
+        db.client = None
+        db.db = None
+        print("🔌 MongoDB connection closed")
