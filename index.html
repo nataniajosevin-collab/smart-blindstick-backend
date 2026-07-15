@@ -11,9 +11,6 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
@@ -45,12 +42,7 @@
             height: 400px;
             border-radius: 12px;
             overflow: hidden;
-        }
-        .status-online {
-            color: #22c55e;
-        }
-        .status-offline {
-            color: #ef4444;
+            z-index: 1;
         }
     </style>
 </head>
@@ -65,8 +57,8 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <div class="flex items-center space-x-2">
-                        <div id="connectionStatus" class="w-3 h-3 bg-green-400 rounded-full status-indicator"></div>
-                        <span id="connectionText" class="text-sm">Terhubung</span>
+                        <div id="connectionStatus" class="w-3 h-3 bg-red-500 rounded-full status-indicator"></div>
+                        <span id="connectionText" class="text-sm">Menghubungkan...</span>
                     </div>
                     <span id="currentTime" class="text-sm"></span>
                 </div>
@@ -82,7 +74,7 @@
                     <i data-lucide="alert-triangle" class="w-6 h-6"></i>
                     <div>
                         <h3 class="font-bold text-lg">⚠️ PERINGATAN!</h3>
-                        <p id="alertMessage">Ada objek mendekati</p>
+                        <p id="alertMessage">Ada objek terlalu dekat di sekitar anak!</p>
                     </div>
                 </div>
             </div>
@@ -95,7 +87,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-gray-500 text-sm">Status GPS</p>
-                        <p id="gpsStatus" class="text-2xl font-bold text-green-600">Aktif</p>
+                        <p id="gpsStatus" class="text-2xl font-bold text-red-600">Mencari Sinyal</p>
                     </div>
                     <i data-lucide="map-pin" class="w-10 h-10 text-blue-500"></i>
                 </div>
@@ -106,7 +98,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-gray-500 text-sm">Status Tongkat</p>
-                        <p id="stickStatus" class="text-2xl font-bold text-green-600">Online</p>
+                        <p id="stickStatus" class="text-2xl font-bold text-red-600">Offline</p>
                     </div>
                     <i data-lucide="hand" class="w-10 h-10 text-green-500"></i>
                 </div>
@@ -116,8 +108,8 @@
             <div class="bg-white rounded-lg shadow-md p-4 sensor-card">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-gray-500 text-sm">Motor Vibrator</p>
-                        <p id="vibrationStatus" class="text-2xl font-bold text-gray-800">Mati</p>
+                        <p class="text-gray-500 text-sm">Jarak Halangan Terdekat</p>
+                        <p id="vibrationStatus" class="text-2xl font-bold text-gray-800">- cm</p>
                     </div>
                     <i data-lucide="vibrate" class="w-10 h-10 text-purple-500"></i>
                 </div>
@@ -128,14 +120,14 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-gray-500 text-sm">Baterai</p>
-                        <p id="batteryLevel" class="text-2xl font-bold text-gray-800">85%</p>
+                        <p id="batteryLevel" class="text-2xl font-bold text-gray-800">-%</p>
                     </div>
                     <i data-lucide="battery-full" class="w-10 h-10 text-green-500"></i>
                 </div>
             </div>
         </div>
 
-        <!-- Main Content: Map -->
+        <!-- Main Content -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <!-- Map Section -->
             <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-4">
@@ -147,14 +139,14 @@
                 <div class="mt-4 grid grid-cols-2 gap-4">
                     <div>
                         <p class="text-sm text-gray-500">Latitude</p>
-                        <p id="latitude" class="text-lg font-semibold">-6.2088</p>
+                        <p id="latitude" class="text-lg font-semibold">-</p>
                     </div>
                     <div>
                         <p class="text-sm text-gray-500">Longitude</p>
-                        <p id="longitude" class="text-lg font-semibold">106.8456</p>
+                        <p id="longitude" class="text-lg font-semibold">-</p>
                     </div>
                 </div>
-                <div class="mt-2 flex items-center justify-between">
+                <div class="mt-4 flex items-center justify-between">
                     <a id="mapsLink" href="#" target="_blank" 
                        class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition">
                         📍 Buka di Google Maps
@@ -164,29 +156,167 @@
             </div>
 
             <!-- Control Panel -->
-            <div class="bg-white rounded-lg shadow-md p-4">
-                <h2 class="text-xl font-bold mb-4 flex items-center">
-                    <i data-lucide="settings" class="w-6 h-6 mr-2"></i>
-                    Panel Orang Tua
-                </h2>
-                
-                <!-- Alert Aktif -->
-                <div class="mb-6 p-4 bg-red-50 rounded-lg">
-                    <h3 class="font-semibold text-red-700 flex items-center">
-                        <i data-lucide="bell" class="w-5 h-5 mr-2"></i>
-                        Alert Aktif
-                    </h3>
-                    <p id="activeAlertCount" class="text-2xl font-bold text-red-600">0</p>
-                    <div id="alertList" class="mt-2 text-sm text-gray-600"></div>
+            <div class="bg-white rounded-lg shadow-md p-4 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xl font-bold mb-4 flex items-center">
+                        <i data-lucide="settings" class="w-6 h-6 mr-2"></i>
+                        Panel Orang Tua
+                    </h2>
+                    
+                    <!-- Alert Aktif -->
+                    <div class="mb-6 p-4 bg-red-50 rounded-lg">
+                        <h3 class="font-semibold text-red-700 flex items-center">
+                            <i data-lucide="bell" class="w-5 h-5 mr-2"></i>
+                            Alert Sensor Aktif
+                        </h3>
+                        <div id="alertList" class="mt-2 text-sm text-gray-700 space-y-1">
+                            Menunggu data...
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Vibration Motor Control -->
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Kontrol Motor Vibrator
-                    </label>
-                    <div class="flex space-x-2">
-                        <button id="vibrationOn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">
-                            ON
-                        </button>
-                        <button id="vibrationOff" class="flex-1 bg-red-
+                <!-- Info Kontak Darurat / Catatan -->
+                <div class="p-4 bg-blue-50 rounded-lg text-sm text-blue-800">
+                    <p class="font-semibold mb-1">💡 Petunjuk:</p>
+                    <p>Dashboard ini melakukan update otomatis secara real-time setiap 2 detik dari cloud server Railway.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- JavaScript Integrasi Backend -->
+    <script>
+        // Inisialisasi ikon Lucide
+        lucide.createIcons();
+
+        // Tampilkan jam waktu sekarang pada header
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('currentTime').innerText = now.toLocaleTimeString('id-ID');
+        }, 1000);
+
+        // --- KONFIGURASI LEAFLET MAP ---
+        // Default koordinat jika GPS belum fix (Pekanbaru/Padang sekitarnya)
+        let map = L.map('map').setView([-0.9431, 100.3722], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let marker = L.marker([-0.9431, 100.3722]).addTo(map)
+            .bindPopup("<b>Posisi Anak</b>")
+            .openPopup();
+
+        // --- PENGAMBILAN DATA REAL-TIME DARI RAILWAY ---
+        // Ganti URL ini dengan domain backend Railway kamu
+        const BACKEND_URL = "https://smart-blindstick-backend-production.up.railway.app/api/sensors";
+
+        async function fetchSensorData() {
+            try {
+                const response = await fetch(BACKEND_URL);
+                if (!response.ok) throw new Error("Gagal mengambil data");
+                
+                const dataList = await response.json();
+                
+                // Jika server mengembalikan array data, ambil data paling terakhir/terbaru
+                if (dataList && dataList.length > 0) {
+                    const latestData = dataList[dataList.length - 1]; 
+                    updateDashboard(latestData);
+                } else if (dataList && typeof dataList === 'object' && !Array.isArray(dataList)) {
+                    // Jika data dikembalikan berupa satu objek langsung
+                    updateDashboard(dataList);
+                }
+            } catch (error) {
+                console.error("Error fetching:", error);
+                document.getElementById('connectionStatus').className = "w-3 h-3 bg-red-500 rounded-full status-indicator";
+                document.getElementById('connectionText').innerText = "Terputus";
+                document.getElementById('stickStatus').innerText = "Offline";
+                document.getElementById('stickStatus').className = "text-2xl font-bold text-red-600";
+            }
+        }
+
+        function updateDashboard(data) {
+            // 1. Update status koneksi dashboard ke server
+            document.getElementById('connectionStatus').className = "w-3 h-3 bg-green-400 rounded-full status-indicator";
+            document.getElementById('connectionText').innerText = "Terhubung";
+            document.getElementById('stickStatus').innerText = "Online";
+            document.getElementById('stickStatus').className = "text-2xl font-bold text-green-600";
+
+            // 2. Update Baterai
+            const battery = Math.round(data.battery || 0);
+            document.getElementById('batteryLevel').innerText = battery + "%";
+
+            // 3. Update Jarak Sensor
+            const ultrasonic = data.ultrasonic || 0;
+            const tofLeft = (data.tofLeft || 0) / 10; // Ubah mm ke cm
+            const tofRight = (data.tofRight || 0) / 10; // Ubah mm ke cm
+            
+            // Jarak terendah
+            const nearestDistance = Math.round(data.alertDistance || Math.min(ultrasonic, tofLeft, tofRight));
+            document.getElementById('vibrationStatus').innerText = nearestDistance + " cm";
+
+            // 4. Update Panel Alert Bahaya jika jarak < 50 cm
+            const alertSection = document.getElementById('alertSection');
+            const alertList = document.getElementById('alertList');
+            
+            let alertsHtml = "";
+            let isDanger = false;
+
+            if (ultrasonic < 50 && ultrasonic > 0) {
+                alertsHtml += `<p class="text-red-600">🚨 Depan terlalu dekat: ${Math.round(ultrasonic)} cm</p>`;
+                isDanger = true;
+            }
+            if (tofLeft < 50 && tofLeft > 0) {
+                alertsHtml += `<p class="text-red-600">🚨 Kiri terlalu dekat: ${Math.round(tofLeft)} cm</p>`;
+                isDanger = true;
+            }
+            if (tofRight < 50 && tofRight > 0) {
+                alertsHtml += `<p class="text-red-600">🚨 Kanan terlalu dekat: ${Math.round(tofRight)} cm</p>`;
+                isDanger = true;
+            }
+
+            if (isDanger) {
+                alertSection.classList.remove('hidden');
+                alertList.innerHTML = alertsHtml;
+            } else {
+                alertSection.classList.add('hidden');
+                alertList.innerHTML = `<p class="text-green-600">✅ Keadaan Aman</p>`;
+            }
+
+            // 5. Update GPS & Peta Leaflet
+            const gpsData = data.gps || {};
+            const isGpsFix = gpsData.gpsFix || false;
+            
+            if (isGpsFix && gpsData.latitude && gpsData.longitude) {
+                document.getElementById('gpsStatus').innerText = "Aktif (Fix)";
+                document.getElementById('gpsStatus').className = "text-2xl font-bold text-green-600";
+                
+                const lat = gpsData.latitude;
+                const lng = gpsData.longitude;
+
+                document.getElementById('latitude').innerText = lat.toFixed(6);
+                document.getElementById('longitude').innerText = lng.toFixed(6);
+
+                // Update posisi pin marker & peta ke koordinat baru
+                const newLatLng = new L.LatLng(lat, lng);
+                marker.setLatLng(newLatLng);
+                map.panTo(newLatLng);
+
+                // Update link tombol Google Maps
+                document.getElementById('mapsLink').href = `https://maps.google.com/?q=${lat},${lng}`;
+            } else {
+                document.getElementById('gpsStatus').innerText = "Mencari Sinyal";
+                document.getElementById('gpsStatus').className = "text-2xl font-bold text-yellow-600";
+            }
+
+            // 6. Terakhir Update Waktu Data
+            const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleTimeString('id-ID') : new Date().toLocaleTimeString('id-ID');
+            document.getElementById('lastUpdate').innerText = "Terakhir update: " + timestamp;
+        }
+
+        // Jalankan pengambilan data secara otomatis setiap 2 detik
+        fetchSensorData();
+        setInterval(fetchSensorData, 2000);
+    </script>
+</body>
+</html>
